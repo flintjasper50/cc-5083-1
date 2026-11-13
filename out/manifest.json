@@ -1,0 +1,67 @@
+[
+  {
+    "name": "synth_grid",
+    "version": "6f3b42d64b83",
+    "created": "2026-11-13T09:16:03.236496+00:00",
+    "files": [
+      "synth_grid_reference_6f3b42d64b83.png",
+      "synth_grid_input_6f3b42d64b83.png",
+      "synth_grid_corrected_6f3b42d64b83.png",
+      "synth_grid_validity_6f3b42d64b83.png",
+      "synth_grid_map_6f3b42d64b83.npz",
+      "synth_grid_params_6f3b42d64b83.json"
+    ]
+  },
+  {
+    "name": "synth_grid",
+    "version": "6382aa3f6f88",
+    "created": "2026-11-13T09:16:04.321970+00:00",
+    "files": [
+      "synth_grid_reference_6382aa3f6f88.png",
+      "synth_grid_input_6382aa3f6f88.png",
+      "synth_grid_corrected_6382aa3f6f88.png",
+      "synth_grid_validity_6382aa3f6f88.png",
+      "synth_grid_map_6382aa3f6f88.npz",
+      "synth_grid_params_6382aa3f6f88.json"
+    ]
+  },
+  {
+    "name": "synth_lines",
+    "version": "686528bc693e",
+    "created": "2026-11-13T09:16:05.966913+00:00",
+    "files": [
+      "synth_lines_reference_686528bc693e.png",
+      "synth_lines_input_686528bc693e.png",
+      "synth_lines_corrected_686528bc693e.png",
+      "synth_lines_validity_686528bc693e.png",
+      "synth_lines_map_686528bc693e.npz",
+      "synth_lines_params_686528bc693e.json"
+    ]
+  },
+  {
+    "name": "synth_plane",
+    "version": "49cbc6f532a4",
+    "created": "2026-11-13T09:16:08.171479+00:00",
+    "files": [
+      "synth_plane_reference_49cbc6f532a4.png",
+      "synth_plane_input_49cbc6f532a4.png",
+      "synth_plane_corrected_49cbc6f532a4.png",
+      "synth_plane_validity_49cbc6f532a4.png",
+      "synth_plane_map_49cbc6f532a4.npz",
+      "synth_plane_params_49cbc6f532a4.json"
+    ]
+  },
+  {
+    "name": "synth_grid",
+    "version": "6a24f4129ca9",
+    "created": "2026-11-13T09:16:33.287271+00:00",
+    "files": [
+      "synth_grid_reference_6a24f4129ca9.png",
+      "synth_grid_input_6a24f4129ca9.png",
+      "synth_grid_corrected_6a24f4129ca9.png",
+      "synth_grid_validity_6a24f4129ca9.png",
+      "synth_grid_map_6a24f4129ca9.npz",
+      "synth_grid_params_6a24f4129ca9.json"
+    ]
+  }
+]
