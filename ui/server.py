@@ -2,8 +2,15 @@
 """滚动快门校正 Web 界面（仅标准库 + 本项目的 rs 包）。
 
   python3 ui/server.py --port 8000
+
+两个面板共用同一条行曝校正处理链（rs.pipeline）：
+  * 合成验证：前向成像 + 校正，附控制点映射误差；
+  * 照片校正：载入真实照片 + 参数/姿态文件，控件直接调整行时序，
+    显示真实校正影像、有效性掩码与映射求解残差。
 """
 import argparse
+import base64
+import io
 import json
 import os
 import sys
@@ -12,7 +19,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from rs import imaging, pipeline
+import numpy as np
+from PIL import Image
+
+from rs import Params, PoseTrack, imaging, pipeline
 from rs.exporter import Exporter
 
 OUT_DIR = os.path.join(ROOT, "out")
@@ -38,15 +48,50 @@ PAGE = """<!doctype html>
  pre{background:#1e2430;color:#d7e0ee;padding:10px;border-radius:8px;font-size:12px;overflow:auto;max-height:340px}
  .legend span{display:inline-block;margin-right:12px;font-size:12px}
  .sw{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:4px;vertical-align:-2px}
- #ver{font-family:monospace;color:#0a7}
+ #ver,#pver{font-family:monospace;color:#0a7}
  a{color:#0b6bcb}
+ .metric{font-size:13px;margin:4px 0}
+ .metric b{color:#0b6bcb}
+ input[type=file]{font-size:12px}
 </style>
 </head>
 <body>
 <h1>逐行曝光滚动快门校正器 <small style="font-size:12px;color:#777">纯旋转 / 已知平面假设 · 逐像素曝光时刻求解</small></h1>
 
 <div class="panel">
- <h2>参数（与导出文件共用同一参数版本）</h2>
+ <h2>照片校正（载入照片，调整行时序，核对校正影像与映射误差）</h2>
+ <div class="ctrl"><label>照片（PNG/JPEG）</label><input type="file" id="p_img" accept="image/*"></div>
+ <div class="ctrl"><label>参数 JSON（含 t_ref_s）</label><input type="file" id="p_params" accept=".json"></div>
+ <div class="ctrl"><label>姿态 JSON（显式时间戳）</label><input type="file" id="p_poses" accept=".json"></div>
+ <div class="ctrl"><label>行读出方向</label>
+  <select id="p_direction">
+   <option value="">按参数文件</option>
+   <option value="top_to_bottom">自上而下</option>
+   <option value="bottom_to_top">自下而上</option>
+   <option value="left_to_right">自左而右</option>
+   <option value="right_to_left">自右而左</option>
+  </select></div>
+ <div class="ctrl"><label>行读出总时长 <output id="po_readout">32</output> ms</label>
+  <input type="range" id="p_readout_ms" min="1" max="80" step="0.5" value="32"></div>
+ <div class="ctrl"><label>时间偏移 <output id="po_off">+2.0</output> ms</label>
+  <input type="range" id="p_t_offset_ms" min="-10" max="10" step="0.1" value="2"></div>
+ <div class="ctrl"><label>参考时刻 <output id="po_tref">16</output> ms</label>
+  <input type="range" id="p_t_ref_ms" min="0" max="80" step="0.5" value="16"></div>
+ <div style="margin-top:8px">
+  <button id="p_run">校正照片</button>
+  <span id="pver"></span>
+ </div>
+ <div class="metric" id="p_metrics">未运行</div>
+ <div class="imgs">
+  <figure><figcaption>输入照片</figcaption><img id="p_im_in"></figure>
+  <figure><figcaption>校正结果（无效区域留空）</figcaption><img id="p_im_out"></figure>
+  <figure><figcaption>有效性掩码</figcaption><img id="p_im_val"></figure>
+ </div>
+ <pre id="p_stats">尚未运行</pre>
+</div>
+
+<div class="panel">
+ <h2>合成验证（与导出文件共用同一参数版本）</h2>
  <div class="ctrl"><label>场景</label>
   <select id="scene">
    <option value="grid">网格控制点</option>
@@ -68,6 +113,7 @@ PAGE = """<!doctype html>
  <div class="ctrl"><label>运动剖面</label>
   <select id="motion">
    <option value="mixed">混合</option>
+   <option value="static">静止（零角速度）</option>
    <option value="yaw">偏航</option>
    <option value="roll">横滚</option>
    <option value="pitch">俯仰</option>
@@ -87,6 +133,7 @@ PAGE = """<!doctype html>
   <button id="run">运行校正</button>
   <button id="export" class="sec">导出图像+映射（版本 <span id="ver">—</span>）</button>
  </div>
+ <div class="metric" id="s_metrics">未运行</div>
 </div>
 
 <div class="imgs">
@@ -115,17 +162,28 @@ function cfg(){
     t_offset_ms:+$('t_offset_ms').value, t_ref_ms:+$('t_ref_ms').value,
     gyro_hz:+$('gyro_hz').value, moving:$('moving').checked};
 }
-function show(o){
+function show(){
   $('o_readout').textContent = $('readout_ms').value;
   $('o_off').textContent = (+$('t_offset_ms').value).toFixed(1);
   $('o_tref').textContent = $('t_ref_ms').value;
   $('o_gyro').textContent = $('gyro_hz').value;
+  $('po_readout').textContent = $('p_readout_ms').value;
+  $('po_off').textContent = (+$('p_t_offset_ms').value).toFixed(1);
+  $('po_tref').textContent = $('p_t_ref_ms').value;
 }
 async function post(url, body){
   const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify(body)});
-  if(!r.ok) throw new Error(await r.text());
+  if(!r.ok) throw new Error((await r.json()).error || await r.text());
   return await r.json();
+}
+function fmtMetrics(s, cp){
+  let m = '映射误差：';
+  if(cp && cp.mean_px != null) m += `控制点均值 <b>${cp.mean_px.toFixed(4)} px</b>，最大 <b>${cp.max_px.toFixed(4)} px</b>；`;
+  m += `曝光时刻求解残差 <b>${(s.max_dt_residual_s*1000).toFixed(4)} ms</b>；` +
+       `有效比例 <b>${(s.valid_fraction*100).toFixed(1)}%</b>；` +
+       `姿态检查 <b>${s.pose_report.ok ? '通过' : '拒绝（见详情）'}</b>`;
+  return m;
 }
 async function run(){
   show();
@@ -137,8 +195,40 @@ async function run(){
     $('im_out').src = d.images.corrected;
     $('im_val').src = d.images.validity;
     $('ver').textContent = d.stats.version;
+    $('s_metrics').innerHTML = fmtMetrics(d.stats, d.stats.control_points);
     $('stats').textContent = JSON.stringify(d.stats, null, 2);
   }catch(e){ $('stats').textContent = '出错：' + e.message; }
+}
+function readFile(input, as){
+  return new Promise((res, rej) => {
+    const f = input.files[0];
+    if(!f){ rej(new Error('请先选择 ' + input.id + ' 文件')); return; }
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = () => rej(new Error('读取文件失败'));
+    if(as === 'text') r.readAsText(f); else r.readAsDataURL(f);
+  });
+}
+async function runPhoto(){
+  show();
+  $('p_stats').textContent = '计算中…';
+  try{
+    const [img, paramsTxt, posesTxt] = await Promise.all([
+      readFile($('p_img'), 'dataURL'), readFile($('p_params'), 'text'),
+      readFile($('p_poses'), 'text')]);
+    const body = {image: img, params: JSON.parse(paramsTxt), poses: JSON.parse(posesTxt),
+      overrides: {readout_ms: +$('p_readout_ms').value,
+                  t_offset_ms: +$('p_t_offset_ms').value,
+                  t_ref_ms: +$('p_t_ref_ms').value}};
+    if($('p_direction').value) body.overrides.direction = $('p_direction').value;
+    const d = await post('/api/photo', body);
+    $('p_im_in').src = d.images.input;
+    $('p_im_out').src = d.images.corrected;
+    $('p_im_val').src = d.images.validity;
+    $('pver').textContent = '版本 ' + d.stats.version;
+    $('p_metrics').innerHTML = fmtMetrics(d.stats, null);
+    $('p_stats').textContent = JSON.stringify(d.stats, null, 2);
+  }catch(e){ $('p_stats').textContent = '出错：' + e.message; }
 }
 async function doExport(){
   try{
@@ -147,13 +237,53 @@ async function doExport(){
       d.files.map(f => '<a href="/out/' + f + '">' + f + '</a>').join('<br>');
   }catch(e){ $('exports').textContent = '导出失败：' + e.message; }
 }
-for(const id of ['readout_ms','t_offset_ms','t_ref_ms','gyro_hz']) $(id).oninput = show;
-$('run').onclick = run; $('export').onclick = doExport;
+for(const id of ['readout_ms','t_offset_ms','t_ref_ms','gyro_hz',
+                 'p_readout_ms','p_t_offset_ms','p_t_ref_ms']) $(id).oninput = show;
+$('run').onclick = run; $('export').onclick = doExport; $('p_run').onclick = runPhoto;
+show();
 run();
 </script>
 </body>
 </html>
 """
+
+
+def _decode_image(data_url):
+    try:
+        raw = base64.b64decode(data_url.split(",", 1)[1])
+        arr = np.asarray(Image.open(io.BytesIO(raw)).convert("RGB"), dtype=np.float64)
+    except (IndexError, ValueError) as e:
+        raise ValueError(f"照片解码失败：{e}")
+    return arr / 255.0
+
+
+def _apply_overrides(params, ov):
+    """UI 控件 -> 行时序参数（秒）；未给出的键保持参数文件原值。"""
+    rd = dict(params.readout)
+    if "readout_ms" in ov:
+        rd["readout_time_s"] = float(ov["readout_ms"]) / 1000.0
+    if "direction" in ov:
+        rd["direction"] = ov["direction"]
+    if "t_offset_ms" in ov:
+        rd["t_offset_s"] = float(ov["t_offset_ms"]) / 1000.0
+    t_ref = float(ov["t_ref_ms"]) / 1000.0 if "t_ref_ms" in ov else params.t_ref
+    return Params(camera=params.camera, readout=rd, t_ref=t_ref,
+                  scene=params.scene, motion=params.motion, notes=params.notes)
+
+
+def _photo_response(body):
+    params = _apply_overrides(Params.from_dict(body["params"]), body.get("overrides", {}))
+    track = PoseTrack.from_dict(body["poses"])
+    img = _decode_image(body["image"])
+    corrected, inv, stats = pipeline.run_photo(img, params, track)
+    return {
+        "stats": stats,
+        "images": {
+            "input": imaging.png_data_uri(img),
+            "corrected": imaging.png_data_uri(corrected),
+            "validity": imaging.png_data_uri(imaging.validity_image(inv.reasons)),
+        },
+    }
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -203,6 +333,8 @@ class Handler(BaseHTTPRequestHandler):
                     },
                 }
                 self._send(200, json.dumps(body, ensure_ascii=False))
+            elif self.path == "/api/photo":
+                self._send(200, json.dumps(_photo_response(cfg), ensure_ascii=False))
             elif self.path == "/api/export":
                 res = pipeline.run_synthetic(cfg)
                 exp = Exporter(OUT_DIR)
@@ -215,7 +347,8 @@ class Handler(BaseHTTPRequestHandler):
                         "corrected": res["images"]["corrected"],
                         "validity": imaging.validity_image(res["inv"].reasons).astype(float) / 255.0,
                     },
-                    inv=res["inv"], track=res["track_corr"], K=res["K"])
+                    inv=res["inv"], track=res["track_corr"], K=res["K"],
+                    extra_npz={"fmap_uv": res["fmap"], "fmap_valid": res["fvalid"]})
                 out["files"] = [os.path.basename(f) for f in out["files"]]
                 self._send(200, json.dumps(out, ensure_ascii=False))
             else:

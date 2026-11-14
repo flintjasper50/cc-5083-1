@@ -15,22 +15,14 @@
   },
   "t_ref_s": 0.016,
   "scene": {
-    "model": "rotation",
-    "moving_object": {
-      "x": 384.0,
-      "y": 120.0,
-      "w": 115.2,
-      "h": 144.0,
-      "vx": -900.0,
-      "vy": 250.0
-    }
+    "model": "rotation"
   },
   "motion": {
     "type": "body_rate",
     "omega_rad_s": [
-      0.12,
-      0.5,
-      0.08
+      0.0,
+      0.0,
+      0.0
     ],
     "gyro_hz": 500.0,
     "pose_span_s": [

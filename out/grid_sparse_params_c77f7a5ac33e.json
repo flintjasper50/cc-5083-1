@@ -15,23 +15,7 @@
   },
   "t_ref_s": 0.016,
   "scene": {
-    "model": "plane",
-    "normal": [
-      0.0,
-      0.0,
-      1.0
-    ],
-    "dist": 2.0,
-    "center0": [
-      0.0,
-      0.0,
-      0.0
-    ],
-    "velocity": [
-      0.5,
-      0.2,
-      0.0
-    ]
+    "model": "rotation"
   },
   "motion": {
     "type": "body_rate",
@@ -40,7 +24,7 @@
       0.5,
       0.08
     ],
-    "gyro_hz": 500.0,
+    "gyro_hz": 8.0,
     "pose_span_s": [
       -0.025,
       0.057

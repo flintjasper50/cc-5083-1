@@ -1,4 +1,10 @@
-"""Parameter bundle with a content hash used as the export version tag."""
+"""Parameter bundle with a content hash used as the export version tag.
+
+All quantities are SI on the pose clock: seconds, radians, meters, pixels.
+`t_ref` is mandatory: it is the reference exposure instant the corrected image
+is aligned to. Files without it are rejected — there is no safe default,
+because t_ref chooses which instant of the motion the output frame represents.
+"""
 import hashlib
 import json
 from dataclasses import dataclass, field
@@ -45,10 +51,16 @@ class Params:
     def from_dict(cls, d):
         d = dict(d)
         d.pop("units", None)
+        t_ref = d.get("t_ref_s", d.get("t_ref"))  # "t_ref" accepted for pre-t_ref_s files
+        if t_ref is None:
+            raise ValueError(
+                "参数文件缺少时间参考 t_ref_s（参考曝光时刻，姿态时钟秒）。"
+                "校正器不会默默猜测该值：请显式写入，例如取曝光窗口中点 "
+                "t0_s + t_offset_s + readout_time_s/2。")
         return cls(
             camera=d["camera"],
             readout=d["readout"],
-            t_ref=d.get("t_ref_s", d.get("t_ref")),
+            t_ref=float(t_ref),
             scene=d["scene"],
             motion=d["motion"],
             notes=d.get("notes", ""),

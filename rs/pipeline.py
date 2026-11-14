@@ -14,6 +14,7 @@ from .poses import PoseTrack
 TRUE_OFFSET_S = 0.002  # hidden sensor-vs-pose clock offset used by the synthesizer
 
 OMEGAS = {
+    "static": (0.0, 0.0, 0.0),  # zero angular velocity: correction must be a no-op
     "yaw": (0.0, 0.5, 0.0),
     "roll": (0.0, 0.0, 0.35),
     "pitch": (0.3, 0.0, 0.0),
@@ -93,6 +94,40 @@ def _line_wobble(img, bars, half=4, thresh=0.4):
             cent.append(x0 + cols.mean())
         wobbles.append(float(np.std(cent)))
     return float(np.mean(wobbles)) if wobbles else None
+
+
+def run_photo(img, params, track):
+    """Photo correction chain shared by the CLI and the web UI.
+
+    img: float HxWx3 in [0,1]; params: Params (camera/readout/t_ref/scene);
+    track: PoseTrack on the same clock as the readout times.
+    Returns (corrected, inv, stats).
+    """
+    cam = params.camera
+    K = Intrinsics(cam["fx_px"], cam["fy_px"], cam["cx_px"], cam["cy_px"])
+    if img.shape[1] != cam["width_px"] or img.shape[0] != cam["height_px"]:
+        raise ValueError(
+            f"照片尺寸 {img.shape[1]}x{img.shape[0]} 与参数 "
+            f"{cam['width_px']}x{cam['height_px']} 不一致")
+    rd = params.readout
+    readout = ReadoutSpec(cam["width_px"], cam["height_px"], rd["readout_time_s"],
+                          rd["direction"], rd.get("t0_s", 0.0), rd.get("t_offset_s", 0.0))
+    q_ref, _ = track.interp(np.array(params.t_ref))
+    sc = params.scene
+    if sc["model"] == "plane":
+        scene = PlaneScene(track, q_ref, K, sc["normal"], sc["dist_m"],
+                           sc["center0_m"], sc["velocity_m_s"], params.t_ref)
+    else:
+        scene = RotationScene(track, q_ref, K)
+    inv = corrector.build_inverse_map(K, readout, scene, params.t_ref, track)
+    corrected = corrector.apply_inverse_map(img, inv)
+    stats = {"version": params.version(),
+             "valid_fraction": float(inv.valid.mean()),
+             "reason_counts": inv.reason_counts(),
+             "pose_report": inv.pose_report,
+             "iterations": inv.iterations,
+             "max_dt_residual_s": inv.max_dt_residual}
+    return corrected, inv, stats
 
 
 def run_synthetic(cfg):
@@ -201,8 +236,10 @@ def run_synthetic(cfg):
         wobble = {"input_px": _line_wobble(img_in, bars),
                   "corrected_px": _line_wobble(np.where(inv.valid[..., None], corrected, 1.0), bars)}
 
-    scene_desc = ({"model": "plane", **{k: list(v) if isinstance(v, tuple) else v
-                                        for k, v in plane.items()}}
+    scene_desc = ({"model": "plane",
+                   "normal": list(plane["normal"]), "dist_m": plane["dist"],
+                   "center0_m": list(plane["center0"]),
+                   "velocity_m_s": list(plane["velocity"])}
                   if cfg["model"] == "plane" and use_plane else {"model": "rotation"})
     if mover is not None:
         scene_desc["moving_object"] = {k: round(float(v), 6) for k, v in mover.items()}

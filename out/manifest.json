@@ -1,67 +1,93 @@
 [
   {
-    "name": "synth_grid",
+    "name": "grid_mixed",
     "version": "6f3b42d64b83",
-    "created": "2026-11-13T09:16:03.236496+00:00",
+    "created": "2026-11-14T04:09:14.689893+00:00",
     "files": [
-      "synth_grid_reference_6f3b42d64b83.png",
-      "synth_grid_input_6f3b42d64b83.png",
-      "synth_grid_corrected_6f3b42d64b83.png",
-      "synth_grid_validity_6f3b42d64b83.png",
-      "synth_grid_map_6f3b42d64b83.npz",
-      "synth_grid_params_6f3b42d64b83.json"
+      "grid_mixed_reference_6f3b42d64b83.png",
+      "grid_mixed_input_6f3b42d64b83.png",
+      "grid_mixed_corrected_6f3b42d64b83.png",
+      "grid_mixed_validity_6f3b42d64b83.png",
+      "grid_mixed_map_6f3b42d64b83.npz",
+      "grid_mixed_params_6f3b42d64b83.json"
     ]
   },
   {
-    "name": "synth_grid",
-    "version": "6382aa3f6f88",
-    "created": "2026-11-13T09:16:04.321970+00:00",
+    "name": "grid_reversed",
+    "version": "70abb31edb23",
+    "created": "2026-11-14T04:09:15.703399+00:00",
     "files": [
-      "synth_grid_reference_6382aa3f6f88.png",
-      "synth_grid_input_6382aa3f6f88.png",
-      "synth_grid_corrected_6382aa3f6f88.png",
-      "synth_grid_validity_6382aa3f6f88.png",
-      "synth_grid_map_6382aa3f6f88.npz",
-      "synth_grid_params_6382aa3f6f88.json"
+      "grid_reversed_reference_70abb31edb23.png",
+      "grid_reversed_input_70abb31edb23.png",
+      "grid_reversed_corrected_70abb31edb23.png",
+      "grid_reversed_validity_70abb31edb23.png",
+      "grid_reversed_map_70abb31edb23.npz",
+      "grid_reversed_params_70abb31edb23.json"
     ]
   },
   {
-    "name": "synth_lines",
+    "name": "grid_static",
+    "version": "012a20df15da",
+    "created": "2026-11-14T04:09:16.585489+00:00",
+    "files": [
+      "grid_static_reference_012a20df15da.png",
+      "grid_static_input_012a20df15da.png",
+      "grid_static_corrected_012a20df15da.png",
+      "grid_static_validity_012a20df15da.png",
+      "grid_static_map_012a20df15da.npz",
+      "grid_static_params_012a20df15da.json"
+    ]
+  },
+  {
+    "name": "lines_yaw",
     "version": "686528bc693e",
-    "created": "2026-11-13T09:16:05.966913+00:00",
+    "created": "2026-11-14T04:09:17.543447+00:00",
     "files": [
-      "synth_lines_reference_686528bc693e.png",
-      "synth_lines_input_686528bc693e.png",
-      "synth_lines_corrected_686528bc693e.png",
-      "synth_lines_validity_686528bc693e.png",
-      "synth_lines_map_686528bc693e.npz",
-      "synth_lines_params_686528bc693e.json"
+      "lines_yaw_reference_686528bc693e.png",
+      "lines_yaw_input_686528bc693e.png",
+      "lines_yaw_corrected_686528bc693e.png",
+      "lines_yaw_validity_686528bc693e.png",
+      "lines_yaw_map_686528bc693e.npz",
+      "lines_yaw_params_686528bc693e.json"
     ]
   },
   {
-    "name": "synth_plane",
-    "version": "49cbc6f532a4",
-    "created": "2026-11-13T09:16:08.171479+00:00",
+    "name": "plane_mixed",
+    "version": "c1da0b6eb029",
+    "created": "2026-11-14T04:09:18.650140+00:00",
     "files": [
-      "synth_plane_reference_49cbc6f532a4.png",
-      "synth_plane_input_49cbc6f532a4.png",
-      "synth_plane_corrected_49cbc6f532a4.png",
-      "synth_plane_validity_49cbc6f532a4.png",
-      "synth_plane_map_49cbc6f532a4.npz",
-      "synth_plane_params_49cbc6f532a4.json"
+      "plane_mixed_reference_c1da0b6eb029.png",
+      "plane_mixed_input_c1da0b6eb029.png",
+      "plane_mixed_corrected_c1da0b6eb029.png",
+      "plane_mixed_validity_c1da0b6eb029.png",
+      "plane_mixed_map_c1da0b6eb029.npz",
+      "plane_mixed_params_c1da0b6eb029.json"
     ]
   },
   {
-    "name": "synth_grid",
+    "name": "grid_extreme",
     "version": "6a24f4129ca9",
-    "created": "2026-11-13T09:16:33.287271+00:00",
+    "created": "2026-11-14T04:09:22.520938+00:00",
     "files": [
-      "synth_grid_reference_6a24f4129ca9.png",
-      "synth_grid_input_6a24f4129ca9.png",
-      "synth_grid_corrected_6a24f4129ca9.png",
-      "synth_grid_validity_6a24f4129ca9.png",
-      "synth_grid_map_6a24f4129ca9.npz",
-      "synth_grid_params_6a24f4129ca9.json"
+      "grid_extreme_reference_6a24f4129ca9.png",
+      "grid_extreme_input_6a24f4129ca9.png",
+      "grid_extreme_corrected_6a24f4129ca9.png",
+      "grid_extreme_validity_6a24f4129ca9.png",
+      "grid_extreme_map_6a24f4129ca9.npz",
+      "grid_extreme_params_6a24f4129ca9.json"
+    ]
+  },
+  {
+    "name": "grid_sparse",
+    "version": "c77f7a5ac33e",
+    "created": "2026-11-14T04:09:23.512170+00:00",
+    "files": [
+      "grid_sparse_reference_c77f7a5ac33e.png",
+      "grid_sparse_input_c77f7a5ac33e.png",
+      "grid_sparse_corrected_c77f7a5ac33e.png",
+      "grid_sparse_validity_c77f7a5ac33e.png",
+      "grid_sparse_map_c77f7a5ac33e.npz",
+      "grid_sparse_params_c77f7a5ac33e.json"
     ]
   }
 ]

@@ -22,6 +22,34 @@ def run(cfg):
     return pipeline.run_synthetic({**FAST, **cfg})
 
 
+class TestReadoutSpec(unittest.TestCase):
+    def test_line_zero_position_per_direction(self):
+        W, H = 640, 480
+        for direction, u, v, expect_r in [
+                ("top_to_bottom", 100, 0, 0.0),
+                ("top_to_bottom", 100, H - 1, H - 1.0),
+                ("bottom_to_top", 100, H - 1, 0.0),      # 倒序：行 0 在底边
+                ("bottom_to_top", 100, 0, H - 1.0),
+                ("left_to_right", 0, 100, 0.0),
+                ("right_to_left", W - 1, 100, 0.0)]:     # 倒序：行 0 在右边
+            rd = ReadoutSpec(W, H, 0.032, direction)
+            self.assertAlmostEqual(float(rd.readout_index(u, v)), expect_r, msg=direction)
+
+    def test_n_lines_and_time_range(self):
+        rd = ReadoutSpec(640, 480, 0.032, "bottom_to_top", t0=0.1, t_offset=0.002)
+        self.assertEqual(rd.n_lines, 480)
+        self.assertEqual(ReadoutSpec(640, 480, 0.032, "right_to_left").n_lines, 640)
+        lo, hi = rd.time_range()
+        self.assertAlmostEqual(lo, 0.102)
+        self.assertAlmostEqual(hi, 0.134)
+        self.assertAlmostEqual(float(rd.line_time(0)), 0.102)      # 首行
+        self.assertAlmostEqual(float(rd.line_time(479)), 0.134)    # 末行
+
+    def test_bad_direction_rejected(self):
+        with self.assertRaises(ValueError):
+            ReadoutSpec(640, 480, 0.032, "diagonal")
+
+
 class TestLie(unittest.TestCase):
     def test_rotvec_roundtrip(self):
         rng = np.random.default_rng(0)
@@ -53,6 +81,34 @@ class TestPoses(unittest.TestCase):
         err = lie.quat_angle_between(analytic.quats, gyro.quats)
         self.assertLess(float(np.max(err)), 1e-8)
 
+    def test_zero_body_rate_is_identity(self):
+        t = np.linspace(0.0, 0.05, 101)
+        tr = PoseTrack.from_body_rate(t, (0.0, 0.0, 0.0))
+        ident = np.tile(np.array([0.0, 0.0, 0.0, 1.0]), (t.size, 1))
+        self.assertTrue(np.allclose(tr.quats, ident, atol=1e-12))
+        gyro = PoseTrack.integrate_gyro(t, np.zeros((t.size, 3)))
+        self.assertTrue(np.allclose(gyro.quats, ident, atol=1e-12))
+        self.assertAlmostEqual(tr.max_step_angle(), 0.0, places=12)
+
+    def test_from_dict_requires_time_base(self):
+        d = {"times_s": [0.0, 0.01], "quats_xyzw": [[0, 0, 0, 1], [0, 0, 0, 1]]}
+        self.assertIsInstance(PoseTrack.from_dict(d), PoseTrack)
+        g = {"gyro_times_s": [0.0, 0.01], "gyro_rad_s": [[0, 0, 0], [0, 0, 0]]}
+        self.assertIsInstance(PoseTrack.from_dict(g), PoseTrack)
+        with self.assertRaises(ValueError):
+            PoseTrack.from_dict({"quats_xyzw": [[0, 0, 0, 1]]})  # 缺 times_s
+        with self.assertRaises(ValueError):
+            PoseTrack.from_dict({"hz": 500})  # 只有采样率，拒绝猜测
+
+    def test_adequacy_report_uses_radians(self):
+        tr = PoseTrack.from_body_rate(np.linspace(0.0, 0.01, 3), (0.0, 30.0, 0.0))
+        rep = tr.adequacy(-0.005, 0.02)
+        self.assertEqual(rep["units"]["angle"], "rad")
+        self.assertIn("max_step_rad", rep)
+        self.assertNotIn("max_step_deg", rep)
+        sparse = [p for p in rep["problems"] if p["type"] == "sparse"][0]
+        self.assertAlmostEqual(sparse["limit_rad"], math.radians(2.0))
+
     def test_adequacy_coverage_and_density(self):
         t = np.linspace(0.0, 0.01, 3)
         tr = PoseTrack.from_body_rate(t, (0.0, 30.0, 0.0))
@@ -67,6 +123,60 @@ class TestPoses(unittest.TestCase):
 
 
 class TestCorrection(unittest.TestCase):
+    def test_static_motion_is_identity(self):
+        res = run({"scene": "grid", "motion": "static"})
+        s = res["stats"]
+        self.assertTrue(s["converged"])
+        self.assertLess(s["control_points"]["mean_px"], 0.05)
+        self.assertLess(s["mae_flat"], 0.01)
+        # 零角速度 + 正确时间偏移：输入本身即无畸变
+        self.assertLess(s["mae_uncorrected"], 0.02)
+
+    def test_reverse_readout_directions(self):
+        for d in ("bottom_to_top", "right_to_left"):
+            res = run({"scene": "grid", "direction": d})
+            s = res["stats"]
+            self.assertTrue(s["converged"], d)
+            self.assertLess(s["control_points"]["mean_px"], 0.3, d)
+
+    def test_pose_coverage_gap_flagged_per_row(self):
+        K = Intrinsics(560.0, 560.0, 159.5, 119.5)
+        readout = ReadoutSpec(320, 240, 0.032, "top_to_bottom")
+        track = PoseTrack.from_body_rate(np.linspace(0.0, 0.01, 51), (0.0, 0.5, 0.0))
+        scene = RotationScene(track, track.interp(np.array(0.005))[0], K)
+        inv = build_inverse_map(K, readout, scene, 0.005, track)
+        counts = inv.reason_counts()
+        self.assertGreater(counts["pose_coverage"], 0)
+        flagged = (inv.reasons & REASON_POSE) != 0
+        # 行时序 t=r*32ms/239，覆盖到 10ms：覆盖终点之后的行必须全部被标记
+        cutoff = int(0.01 / readout.line_dt)
+        self.assertTrue(flagged[cutoff * 2:, :].all())
+        # 覆盖窗口内部的行（除可能解出负时刻的边缘列外）保持有效
+        self.assertTrue(inv.valid[cutoff // 4:cutoff // 2, 20:-20].all())
+        self.assertFalse(inv.pose_report["ok"])
+        self.assertIn("coverage_end",
+                      {p["type"] for p in inv.pose_report["problems"]})
+
+    def test_missing_t_ref_rejected(self):
+        res = run({"scene": "grid"})
+        d = res["params"].to_dict()
+        del d["t_ref_s"]
+        with self.assertRaises(ValueError) as ctx:
+            Params.from_dict(d)
+        self.assertIn("t_ref_s", str(ctx.exception))
+        # 旧键名 t_ref 仍被兼容读取
+        d["t_ref"] = res["params"].t_ref
+        self.assertAlmostEqual(Params.from_dict(d).t_ref, res["params"].t_ref)
+
+    def test_plane_params_roundtrip_through_photo_chain(self):
+        res = run({"scene": "plane", "model": "plane"})
+        d = res["params"].to_dict()
+        self.assertIn("dist_m", d["scene"])  # 旧键名 dist/center0/velocity 已失效
+        params = Params.from_dict(d)
+        corrected, inv, stats = pipeline.run_photo(
+            res["images"]["input"], params, res["track_corr"])
+        self.assertGreater(stats["valid_fraction"], 0.8)
+
     def test_roundtrip_grid(self):
         res = run({"scene": "grid"})
         s = res["stats"]

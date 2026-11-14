@@ -13,8 +13,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from rs import (Exporter, Intrinsics, Params, PlaneScene, PoseTrack, ReadoutSpec,
-                RotationScene, apply_inverse_map, build_inverse_map, imaging, pipeline)
+from rs import (Exporter, Intrinsics, Params, PoseTrack, imaging, pipeline)
 
 
 def cmd_synth(a):
@@ -46,6 +45,7 @@ def cmd_synth(a):
             "validity": imaging.validity_image(res["inv"].reasons).astype(np.float64) / 255.0,
         },
         inv=res["inv"], track=res["track_corr"], K=res["K"],
+        extra_npz={"fmap_uv": res["fmap"], "fmap_valid": res["fvalid"]},
     )
     print("\n导出版本 %s:" % out["version"])
     for f in out["files"]:
@@ -55,40 +55,27 @@ def cmd_synth(a):
 def _load_track(path):
     with open(path, "r", encoding="utf-8") as f:
         d = json.load(f)
-    if "quats_xyzw" in d:
-        return PoseTrack(np.asarray(d["times_s"], float), np.asarray(d["quats_xyzw"], float))
-    return PoseTrack.integrate_gyro(np.asarray(d["gyro_times_s"], float),
-                                    np.asarray(d["gyro_rad_s"], float),
-                                    d.get("q0_xyzw", (0, 0, 0, 1)))
+    try:
+        return PoseTrack.from_dict(d)
+    except ValueError as e:
+        raise SystemExit(f"姿态文件无效：{e}")
 
 
 def cmd_photo(a):
-    params = Params.load(a.params)
+    try:
+        params = Params.load(a.params)
+    except (ValueError, KeyError, json.JSONDecodeError) as e:
+        raise SystemExit(f"参数文件无效：{e}")
     track = _load_track(a.poses)
-    cam = params.camera
-    K = Intrinsics(cam["fx_px"], cam["fy_px"], cam["cx_px"], cam["cy_px"])
-    rd = params.readout
-    readout = ReadoutSpec(cam["width_px"], cam["height_px"], rd["readout_time_s"],
-                          rd["direction"], rd.get("t0_s", 0.0), rd.get("t_offset_s", 0.0))
     img = imaging.load_image(a.image)
-    if img.shape[1] != cam["width_px"] or img.shape[0] != cam["height_px"]:
-        raise SystemExit("照片尺寸与参数中的 width/height 不一致")
-
-    q_ref, _ = track.interp(np.array(params.t_ref))
-    sc = params.scene
-    if sc["model"] == "plane":
-        scene = PlaneScene(track, q_ref, K, sc["normal"], sc["dist_m"],
-                           sc["center0_m"], sc["velocity_m_s"], params.t_ref)
-    else:
-        scene = RotationScene(track, q_ref, K)
-
-    inv = build_inverse_map(K, readout, scene, params.t_ref, track)
-    corrected = apply_inverse_map(img, inv)
-    stats = {"version": params.version(), "valid_fraction": float(inv.valid.mean()),
-             "reason_counts": inv.reason_counts(), "pose_report": inv.pose_report,
-             "iterations": inv.iterations, "max_dt_residual_s": inv.max_dt_residual}
+    try:
+        corrected, inv, stats = pipeline.run_photo(img, params, track)
+    except ValueError as e:
+        raise SystemExit(str(e))
     print(json.dumps(stats, indent=2, ensure_ascii=False))
 
+    cam = params.camera
+    K = Intrinsics(cam["fx_px"], cam["fy_px"], cam["cx_px"], cam["cy_px"])
     exp = Exporter(a.out)
     out = exp.export(
         name="photo", params=params,

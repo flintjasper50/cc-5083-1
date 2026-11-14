@@ -13,8 +13,10 @@ class Exporter:
         self.out_dir = out_dir
         os.makedirs(out_dir, exist_ok=True)
 
-    def export(self, name, params, images, inv, track, K):
-        """images: {tag: float HxWx3}. Returns dict with version and written file paths."""
+    def export(self, name, params, images, inv, track, K, extra_npz=None):
+        """images: {tag: float HxWx3}. extra_npz: optional extra arrays stored in the
+        map file (e.g. fmap_uv ground-truth forward map for synthetic runs).
+        Returns dict with version and written file paths."""
         ver = params.version()
         files = []
         for tag, img in images.items():
@@ -23,8 +25,7 @@ class Exporter:
             files.append(p)
 
         map_path = os.path.join(self.out_dir, f"{name}_map_{ver}.npz")
-        np.savez(
-            map_path,
+        arrays = dict(
             map_uv=inv.uv.astype(np.float64),
             reasons=inv.reasons,
             row_times_s=inv.row_times,
@@ -34,6 +35,9 @@ class Exporter:
             t_ref_s=np.float64(params.t_ref),
             params_json=params.canonical_json(),
         )
+        if extra_npz:
+            arrays.update(extra_npz)
+        np.savez(map_path, **arrays)
         files.append(map_path)
 
         params_path = os.path.join(self.out_dir, f"{name}_params_{ver}.json")

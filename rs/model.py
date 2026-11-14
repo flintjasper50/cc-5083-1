@@ -14,6 +14,21 @@ DIRECTIONS = ("top_to_bottom", "bottom_to_top", "left_to_right", "right_to_left"
 
 @dataclass
 class ReadoutSpec:
+    """Line-exposure timing on the pose clock.
+
+    `direction` says where readout line 0 sits in the image and which way the
+    scan proceeds; every pixel of one line shares one exposure instant:
+
+        top_to_bottom:  line 0 = top row    (v=0),     line index r = v
+        bottom_to_top:  line 0 = bottom row (v=H-1),   r = (H-1) - v
+        left_to_right:  line 0 = left column  (u=0),   r = u
+        right_to_left:  line 0 = right column (u=W-1), r = (W-1) - u
+
+    Line r is exposed at line_time(r) = t0 + t_offset + r * readout_time/(n_lines-1),
+    so `readout_time` is the span from the first to the last line (not per-line).
+    t0 is the first line's instant on the pose clock assuming both clocks agree;
+    t_offset models a constant sensor-vs-pose clock skew. All times in seconds.
+    """
     width: int
     height: int
     readout_time: float       # seconds from first to last line

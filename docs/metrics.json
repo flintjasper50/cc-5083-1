@@ -1,0 +1,149 @@
+[
+  {
+    "name": "grid_mixed",
+    "note": "默认情形：混合角速度，自上而下读出",
+    "version": "6f3b42d64b83",
+    "direction": "top_to_bottom",
+    "motion": "mixed",
+    "cp_n": 48,
+    "cp_mean_px": 2.168120028408948e-06,
+    "cp_max_px": 6.2607020498213706e-06,
+    "mae_flat": 0.00021601657840300802,
+    "valid_fraction": 0.9945279947916666,
+    "converged": true,
+    "pose_ok": true,
+    "reason_counts": {
+      "out_of_bounds": 1681,
+      "pose_coverage": 0,
+      "behind_camera": 0,
+      "folding": 0,
+      "independent_motion": 0
+    }
+  },
+  {
+    "name": "grid_reversed",
+    "note": "倒序读出：行号 0 在图像底边",
+    "version": "70abb31edb23",
+    "direction": "bottom_to_top",
+    "motion": "mixed",
+    "cp_n": 48,
+    "cp_mean_px": 2.5627350933087873e-06,
+    "cp_max_px": 7.1176777392688104e-06,
+    "mae_flat": 0.00021754355194086283,
+    "valid_fraction": 0.9870149739583334,
+    "converged": true,
+    "pose_ok": true,
+    "reason_counts": {
+      "out_of_bounds": 3989,
+      "pose_coverage": 0,
+      "behind_camera": 0,
+      "folding": 0,
+      "independent_motion": 0
+    }
+  },
+  {
+    "name": "grid_static",
+    "note": "零角速度：校正必须退化为恒等",
+    "version": "012a20df15da",
+    "direction": "top_to_bottom",
+    "motion": "static",
+    "cp_n": 48,
+    "cp_mean_px": 0.0,
+    "cp_max_px": 0.0,
+    "mae_flat": 0.0,
+    "valid_fraction": 1.0,
+    "converged": true,
+    "pose_ok": true,
+    "reason_counts": {
+      "out_of_bounds": 0,
+      "pose_coverage": 0,
+      "behind_camera": 0,
+      "folding": 0,
+      "independent_motion": 0
+    }
+  },
+  {
+    "name": "lines_yaw",
+    "note": "竖线场景：偏航导致的倾斜应被拉直",
+    "version": "686528bc693e",
+    "direction": "top_to_bottom",
+    "motion": "yaw",
+    "cp_n": 28,
+    "cp_mean_px": 1.556623775977468e-06,
+    "cp_max_px": 4.703471032257255e-06,
+    "mae_flat": 0.00017617414057416347,
+    "valid_fraction": 0.9922298177083333,
+    "converged": true,
+    "pose_ok": true,
+    "reason_counts": {
+      "out_of_bounds": 2387,
+      "pose_coverage": 0,
+      "behind_camera": 0,
+      "folding": 0,
+      "independent_motion": 0
+    }
+  },
+  {
+    "name": "plane_mixed",
+    "note": "已知平面 + 平移：旋转模型不够，需平面模型",
+    "version": "c1da0b6eb029",
+    "direction": "top_to_bottom",
+    "motion": "mixed",
+    "cp_n": 48,
+    "cp_mean_px": 2.4119482793428316e-06,
+    "cp_max_px": 5.924184587434997e-06,
+    "mae_flat": 0.00021955399611931747,
+    "valid_fraction": 0.99642578125,
+    "converged": true,
+    "pose_ok": true,
+    "reason_counts": {
+      "out_of_bounds": 1098,
+      "pose_coverage": 0,
+      "behind_camera": 0,
+      "folding": 0,
+      "independent_motion": 0
+    }
+  },
+  {
+    "name": "grid_extreme",
+    "note": "剧烈运动：映射折叠与越界区域必须被标记",
+    "version": "6a24f4129ca9",
+    "direction": "top_to_bottom",
+    "motion": "extreme",
+    "cp_n": 7,
+    "cp_mean_px": 164.01809266272022,
+    "cp_max_px": 524.5951290149749,
+    "mae_flat": 0.7544889288582197,
+    "valid_fraction": 0.2048828125,
+    "converged": false,
+    "pose_ok": false,
+    "reason_counts": {
+      "out_of_bounds": 171369,
+      "pose_coverage": 93295,
+      "behind_camera": 46649,
+      "folding": 150054,
+      "independent_motion": 0
+    }
+  },
+  {
+    "name": "grid_sparse",
+    "note": "采样过疏（相邻姿态转角超限）：姿态报告必须拒绝",
+    "version": "c77f7a5ac33e",
+    "direction": "top_to_bottom",
+    "motion": "mixed",
+    "cp_n": 48,
+    "cp_mean_px": 2.1681200303873254e-06,
+    "cp_max_px": 6.2607020498213706e-06,
+    "mae_flat": 0.00021601657840300773,
+    "valid_fraction": 0.9945279947916666,
+    "converged": true,
+    "pose_ok": false,
+    "reason_counts": {
+      "out_of_bounds": 1681,
+      "pose_coverage": 0,
+      "behind_camera": 0,
+      "folding": 0,
+      "independent_motion": 0
+    }
+  }
+]

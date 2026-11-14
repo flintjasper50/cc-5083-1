@@ -24,6 +24,27 @@ class PoseTrack:
             raise ValueError("times must be strictly increasing, need >= 2 samples")
 
     @classmethod
+    def from_dict(cls, d):
+        """Load from a poses-file dict. Two accepted shapes, both with explicit
+        timestamps on the pose clock (seconds):
+
+          {"times_s": [...], "quats_xyzw": [[x,y,z,w], ...]}
+          {"gyro_times_s": [...], "gyro_rad_s": [[wx,wy,wz], ...], "q0_xyzw": [...]}
+
+        Files without an explicit time base are rejected — the sampling rate is
+        never guessed.
+        """
+        if "times_s" in d and "quats_xyzw" in d:
+            return cls(np.asarray(d["times_s"], float), np.asarray(d["quats_xyzw"], float))
+        if "gyro_times_s" in d and "gyro_rad_s" in d:
+            return cls.integrate_gyro(np.asarray(d["gyro_times_s"], float),
+                                      np.asarray(d["gyro_rad_s"], float),
+                                      d.get("q0_xyzw", (0, 0, 0, 1)))
+        raise ValueError(
+            "姿态文件缺少时间基准：需要 times_s+quats_xyzw 或 "
+            "gyro_times_s+gyro_rad_s（秒），不会按采样率猜测时间轴")
+
+    @classmethod
     def from_body_rate(cls, times, omega, q0=(0.0, 0.0, 0.0, 1.0)):
         """Analytic track for constant body-frame angular velocity omega (rad/s)."""
         times = np.asarray(times, dtype=np.float64)
@@ -60,7 +81,10 @@ class PoseTrack:
         return float(np.max(lie.quat_angle_between(self.quats[:-1], self.quats[1:])))
 
     def adequacy(self, t_lo, t_hi, max_step_rad=math.radians(2.0)):
-        """Check the track covers [t_lo, t_hi] densely enough for row-exposure interpolation."""
+        """Check the track covers [t_lo, t_hi] densely enough for row-exposure interpolation.
+
+        The report is all-SI: times in seconds, angles in radians (matching "units").
+        """
         problems = []
         if t_lo < self.times[0] - 1e-12:
             problems.append({
@@ -80,8 +104,8 @@ class PoseTrack:
         if step > max_step_rad:
             problems.append({
                 "type": "sparse",
-                "max_step_deg": math.degrees(step),
-                "limit_deg": math.degrees(max_step_rad),
+                "max_step_rad": step,
+                "limit_rad": max_step_rad,
                 "msg": "相邻姿态样本转角过大，插值不可靠",
             })
         return {
@@ -89,6 +113,6 @@ class PoseTrack:
             "problems": problems,
             "span_s": [float(self.times[0]), float(self.times[-1])],
             "exposure_window_s": [float(t_lo), float(t_hi)],
-            "max_step_deg": math.degrees(step),
+            "max_step_rad": step,
             "units": {"time": "s", "angle": "rad"},
         }
